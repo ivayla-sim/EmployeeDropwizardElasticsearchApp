@@ -1,0 +1,5 @@
+transportClient: false
+clusterName: iva-es-cluster
+servers: [ "localhost:9200" ]
+settings:
+  node.name: iva-es-node
