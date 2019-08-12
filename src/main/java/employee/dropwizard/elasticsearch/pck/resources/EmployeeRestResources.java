@@ -10,6 +10,7 @@ import java.util.Set;
 
 import javax.validation.ConstraintViolation;
 import javax.validation.Validator;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.PUT;
@@ -20,8 +21,6 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 import employee.dropwizard.elasticsearch.pck.client.ElasticsearchRestClient;
 
 //import org.elasticsearch.action.get.GetRequest;
@@ -31,7 +30,6 @@ import employee.dropwizard.elasticsearch.pck.client.ElasticsearchRestClient;
 
 import employee.dropwizard.elasticsearch.pck.core.Employee;
 import employee.dropwizard.elasticsearch.pck.service.EmployeeRestService;
-import employee.dropwizard.elasticsearch.pck.EmployeeDropwizardElasticsearchAppConfiguration;
 
 
 
@@ -39,8 +37,8 @@ import employee.dropwizard.elasticsearch.pck.EmployeeDropwizardElasticsearchAppC
 @Produces(MediaType.APPLICATION_JSON)
 public class EmployeeRestResources {
 	
+	private static final String INDEX = "employees";
 	
-	private ElasticsearchRestClient elasticRestClient;
 	
 	private EmployeeRestService employeeRestService;
 	
@@ -49,7 +47,6 @@ public class EmployeeRestResources {
 	public EmployeeRestResources(EmployeeRestService employeeRestService, Validator validator, ElasticsearchRestClient elasticRestClient) {
 		this.employeeRestService = employeeRestService;
 		this.validator = validator;
-		this.elasticRestClient = elasticRestClient;
 	}
 	
 	
@@ -134,7 +131,52 @@ public class EmployeeRestResources {
 	}
 	
 	
+	@PUT
+	@Path("/_bulk")
+	public Response bulkUploadEmployeeDoc() throws IOException {
+		
+			employeeRestService.bulkUploadEmployeeDoc();
+			return Response.ok().build();
+		
+	}
 	
+	
+	@DELETE
+	@Path("/_delete/{id}")
+	public Response deleteEmployeeById (@PathParam("id") String id) throws IOException {
+		
+		Employee employeeForDetete = employeeRestService.findById(id);
+		
+		System.out.println(employeeForDetete);
+		
+		if(employeeForDetete != null) {
+			employeeRestService.deleteEmployeeDoc(id);
+			return Response.ok("Document " + id + " is successfully deleted").build();
+			
+		} else {
+			return Response.ok("Document " + id + " does not exist").status(Status.NOT_FOUND).build();
+					
+		}	
+	}
+	
+	
+	@DELETE
+	@Path("/delete_index")
+	public Response deleteIndex() throws IOException {
+		
+		Boolean isIndexDeleted = employeeRestService.deleteIndex(INDEX);
+		
+		Response deleteIndexResult = (isIndexDeleted) ? 
+					Response.ok("Index " + INDEX + " is successfully deleted").build() : 
+						Response.ok("Index " + INDEX + " does not exist").status(Status.NOT_FOUND).build();
+					
+		return deleteIndexResult;
+		
+		
+	}
 	
 
 }
+
+
+

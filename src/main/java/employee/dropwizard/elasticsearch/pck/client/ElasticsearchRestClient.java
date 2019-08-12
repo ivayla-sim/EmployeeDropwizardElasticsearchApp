@@ -7,15 +7,12 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import org.apache.http.Header;
 import org.apache.http.HttpHost;
-import org.apache.http.message.BasicHeader;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.TransportAddress;
 
 import employee.dropwizard.elasticsearch.pck.EmployeeDropwizardElasticsearchAppConfiguration;
 import io.dropwizard.lifecycle.Managed;
@@ -25,7 +22,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 
 //import com.google.common.io.Resources;
-import org.elasticsearch.node.Node;
 
 //Singleton class
 public class ElasticsearchRestClient implements Managed {

@@ -8,11 +8,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
-import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+
+import org.elasticsearch.ElasticsearchException;
+//import org.elasticsearch.action.admin.indices.create.CreateIndexRequest; //deprecated
+import org.elasticsearch.client.indices.CreateIndexRequest;
+//import org.elasticsearch.action.admin.indices.create.CreateIndexResponse; //deprecated
+import org.elasticsearch.client.indices.CreateIndexResponse;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteRequest;
+import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
@@ -24,20 +31,17 @@ import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.GetIndexRequest;
-import org.elasticsearch.client.indices.GetIndexResponse;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
-//import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import employee.dropwizard.elasticsearch.pck.core.Employee;
-import employee.dropwizard.elasticsearch.pck.EmployeeDropwizardElasticsearchAppConfiguration;
-import employee.dropwizard.elasticsearch.pck.client.ElasticsearchRestClient;
+
 
 public class EmployeeRestService {
 	
@@ -56,87 +60,96 @@ public class EmployeeRestService {
 	private static final String INDEX = "employees";
 	
 	
-	/*
-	public Boolean createMapping () throws IOException {
+	public boolean createIndexMapping() throws IOException {
 		
-		System.out.println("Start CREATE MAPPING");
+		GetIndexRequest request = new GetIndexRequest(INDEX);
 		
-		String sourceString = 
-				"{\n" +
-				"	\"settings\" : {\n" +
-				"		\"number_of_shards\" : 1,\n" +
-				"		\"number_of_replicas\" : 0\n" +
-				"	},\n" +
-				"	\"mappings\" : {\n" +
-				"		\"employees\" : {\n" +
-				"			\"properties\" : {\n" +
-				"				\"id\" : {\"type\" : \"text\"},\n" +
-				"				\"isActive\" : {\"type\" : \"boolean\"},\n" +
-				"				\"name\" : {\"type\" : \"nested\",\n" +
-				"					\"properties\" : {\n" +
-				"						\"firstName\" : {\"type\" : \"text\"},\n" +
-				"						\"lastName\" : {\"type\" : \"text\"}\n" +
-				"					}\n" +
-				"				}\n" +
-				"				\"designation\" : {\"type\" : \"text\"},\n" +
-				"				\"dateOfJoining\" : {\"type\" : \"date\"},\n" +
-				"				\"salary\" : {\"type\" : \"text\"},\n" +
-				"				\"picture\" : {\"type\" : \"text\"},\n" +
-				"				\"age\" : {\"type\" : \"integer\"},\n" +
-				"				\"gender\" : {\"type\" : \"text\"},\n" +
-				"				\"eyeColor\" : {\"type\" : \"text\"},\n" +
-				"				\"company\" : {\"type\" : \"text\"},\n" +
-				"				\"email\" : {\"type\" : \"text\"},\n" +
-				"				\"phone\" : {\"type\" : \"text\"},\n" +
-				"				\"addresses\" : {\"type\" : \"nested\",\n" +
-				"					\"properties\" : {\n" +
-				"						\"id\" : {\"type\" : \"integer\"},\n" +
-				"						\"country\" : {\"type\" : \"text\"},\n" +
-				"						\"state\" : {\"type\" : \"text\"},\n" +
-				"						\"city\" : {\"type\" : \"text\"},\n" +
-				"						\"streetNameAndNumber\" : {\"type\" : \"text\"},\n" +
-				"						\"zipCode\" : {\"type\" : \"integer\"}\n" +
-				"					}\n" +
-				"				}\n" +
-				"				\"latitude\" : {\"type\" : \"geo-point\"},\n" +
-				"				\"longitude\" : {\"type\" : \"geo-point\"},\n" +
-				"				\"about\" : {\"type\" : \"text\"},\n" +
-				"				\"interests\" : {\"type\" : \"text\"},\n" +
-				"				\"friends\" : {\"type\" : \"nested\",\n" +
-				"					\"properties\" : {\n" +
-				"						\"id\" : {\"type\" : \"integer\"},\n" +
-				"						\"name\" : {\"type\" : \"text\"}\n" +
-				"					}\n" +
-				"				}\n" +
-				"				\"greeting\" : {\"type\" : \"text\"},\n" +
-				"			}\n" +
-				"		}\n" +
-				"	}\n" +
-				"}";
+		boolean exists = client.indices().exists(request, RequestOptions.DEFAULT);
 		
-		XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().value(sourceString);
+		System.out.println(exists);
 		
-		CreateIndexRequest mappingRequest = new CreateIndexRequest(INDEX).source(xContentBuilder);
+		if(!exists) {
+			
+			String sourceString = 
+					"{\n" +
+					"	\"settings\" : {\n" +
+					"		\"number_of_shards\" : 1,\n" +
+					"		\"number_of_replicas\" : 0\n" +
+					"	},\n" +
+					"	\"mappings\" : {\n" +
+					"		\"_doc\" : {\n" +
+					"			\"properties\" : {\n" +
+					"				\"id\" : {\"type\" : \"text\"},\n" +
+					"				\"isActive\" : {\"type\" : \"boolean\"},\n" +
+					"				\"name\" : {\"type\" : \"nested\",\n" +
+					"					\"properties\" : {\n" +
+					"						\"firstName\" : {\"type\" : \"text\"},\n" +
+					"						\"lastName\" : {\"type\" : \"text\"}\n" +
+					"					}\n" +
+					"				},\n" +
+					"				\"designation\" : {\"type\" : \"text\"},\n" +
+					"				\"dateOfJoining\" : {\"type\" : \"date\"},\n" +
+					"				\"salary\" : {\"type\" : \"text\"},\n" +
+					"				\"picture\" : {\"type\" : \"text\"},\n" +
+					"				\"age\" : {\"type\" : \"integer\"},\n" +
+					"				\"gender\" : {\"type\" : \"text\"},\n" +
+					"				\"eyeColor\" : {\"type\" : \"text\"},\n" +
+					"				\"company\" : {\"type\" : \"text\"},\n" +
+					"				\"email\" : {\"type\" : \"text\"},\n" +
+					"				\"phone\" : {\"type\" : \"text\"},\n" +
+					"				\"addresses\" : {\"type\" : \"nested\",\n" +
+					"					\"properties\" : {\n" +
+					"						\"id\" : {\"type\" : \"integer\"},\n" +
+					"						\"country\" : {\"type\" : \"text\"},\n" +
+					"						\"state\" : {\"type\" : \"text\"},\n" +
+					"						\"city\" : {\"type\" : \"text\"},\n" +
+					"						\"streetNameAndNumber\" : {\"type\" : \"text\"},\n" +
+					"						\"zipCode\" : {\"type\" : \"integer\"}\n" +
+					"					}\n" +
+					"				},\n" +
+					"				\"location\" : {\"type\" : \"geo_point\"},\n" +
+					"				\"about\" : {\"type\" : \"text\"},\n" +
+					"				\"interests\" : {\"type\" : \"text\"},\n" +
+					"				\"friends\" : {\"type\" : \"nested\",\n" +
+					"					\"properties\" : {\n" +
+					"						\"id\" : {\"type\" : \"integer\"},\n" +
+					"						\"name\" : {\"type\" : \"text\"}\n" +
+					"					}\n" +
+					"				},\n" +
+					"				\"greeting\" : {\"type\" : \"text\"}\n" +
+					"			}\n" +
+					"		}\n" +
+					"	}\n" +
+					"}";
+						
+			//XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().value(sourceString);
+			
+			CreateIndexRequest createIndexRequest = new CreateIndexRequest(INDEX).source(/*xContentBuilder*/sourceString, XContentType.JSON);
+			
+			CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
+			
+			System.out.println("Created index: " + INDEX + " : " + createIndexResponse.isAcknowledged());
+			
+			return createIndexResponse.isAcknowledged();
+			
+			
+		} else {
+			
+			System.out.println ("Index already exists");
+			
+			return exists;
+			
+		}
 		
-		CreateIndexResponse createIndexResponse = client.indices().create(mappingRequest, RequestOptions.DEFAULT);
-		
-		System.out.println("End CREATE MAPPING");
-		
-		return createIndexResponse.isAcknowledged();
-	
 	}
-	*/
-	
-	
 	
 	
 	public String createEmployeeDoc(Employee employee) throws IOException {
 		System.out.println ("Start Service layer POST");
-		//UUID uuid = UUID.randomUUID();
-	
-		//employee.setEsId(Integer.toString(employeeCDTO.getId()));
 		
-		Map<String, Object> documentMapper = objectMapper.convertValue(employee, Map.class);
+		//Map<String, Object> documentMapper = objectMapper.convertValue(employee, Map.class);
+		
+		Map<String, Object> documentMapper = objectMapper.convertValue(employee, new TypeReference<Map<String, Object>>() {});
 		
 		//the constructor is deprecated
 		//IndexRequest indexRequest = new IndexRequest(INDEX, TYPE_POST, employee.getId()).source(documentMapper);
@@ -174,7 +187,7 @@ public class EmployeeRestService {
 	}
 	
 	
-	public List<Employee> /*SearchHits*/ findAll() throws IOException {
+	public List<Employee> findAll() throws IOException {
 		
 		SearchRequest searchRequest = new SearchRequest(INDEX);
 		
@@ -184,8 +197,6 @@ public class EmployeeRestService {
 		searchRequest.source(searchSourceBuilder);
 		
 		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
-		
-		//return searchResponse.getHits();
 		
 		List<SearchHit> searchHits = Arrays.asList(searchResponse.getHits().getHits());
 		List<Employee> results = new ArrayList<Employee>();
@@ -204,7 +215,10 @@ public class EmployeeRestService {
 		
 		UpdateRequest updateRequest = new UpdateRequest().index(INDEX).id(employee.getId());
 		
-		Map<String, Object> documentMapper = objectMapper.convertValue(employee, Map.class);
+		//Map<String, Object> documentMapper = objectMapper.convertValue(employee, Map.class);
+		
+		Map<String, Object> documentMapper = objectMapper.convertValue(employee, new TypeReference<Map<String, Object>>() {});
+		
 		
 		updateRequest.doc(documentMapper);
 		
@@ -216,97 +230,68 @@ public class EmployeeRestService {
 		
 	}
 	
+	
+	public String deleteEmployeeDoc (String id) throws IOException {
+		
+		System.out.println("Start Service layer DELETE");
+		
+		DeleteRequest deleteRequest = new DeleteRequest(INDEX, id);
+		DeleteResponse deleteResponse = client.delete(deleteRequest, RequestOptions.DEFAULT);
+		
+		System.out.println("End Service layer DELETE");
+		
+		return deleteResponse.getResult().name();
+	
+	}
+	
+	
+	public Boolean deleteIndex (String index) throws IOException {
+		
+		System.out.println("Start Service layer DELETE INDEX");
+		
+		org.elasticsearch.action.support.master.AcknowledgedResponse deleteIndexResponse = new org.elasticsearch.action.support.master.AcknowledgedResponse(false);
+		
+		try {				
+		DeleteIndexRequest deleteIndexRequest = new DeleteIndexRequest(index);		
+		deleteIndexResponse = client.indices().delete(deleteIndexRequest, RequestOptions.DEFAULT);	
+		//return deleteIndexResponse.isAcknowledged();
+		}
+		catch (ElasticsearchException esException) {
+			if (esException.status() == RestStatus.NOT_FOUND) {
+				System.out.println("Index " + index + "does not exist.");
+			}
+		}
+		
+		System.out.println("End Service layer DELETE INDEX");
+		return deleteIndexResponse.isAcknowledged();
+	
+	}
+
+	
+	
+	
 	public void bulkUploadEmployeeDoc() throws IOException {
 		
-		//Response response = client.getLowLevelClient().performRequest("HEAD", "/" + INDEX);
-		
 		try {
-			
-		GetIndexRequest request = new GetIndexRequest(INDEX);
-		
-		boolean exists = client.indices().exists(request, RequestOptions.DEFAULT);
-		
-		System.out.println(exists);
-		
-		if(!exists) {
-			
-			String sourceString = 
-					"{\n" +
-					"	\"settings\" : {\n" +
-					"		\"number_of_shards\" : 1,\n" +
-					"		\"number_of_replicas\" : 0\n" +
-					"	},\n" +
-					"	\"mappings\" : {\n" +
-					"		\"employees\" : {\n" +
-					"			\"properties\" : {\n" +
-					"				\"id\" : {\"type\" : \"text\"},\n" +
-					"				\"isActive\" : {\"type\" : \"boolean\"},\n" +
-					"				\"name\" : {\"type\" : \"nested\",\n" +
-					"					\"properties\" : {\n" +
-					"						\"firstName\" : {\"type\" : \"text\"},\n" +
-					"						\"lastName\" : {\"type\" : \"text\"}\n" +
-					"					}\n" +
-					"				}\n" +
-					"				\"designation\" : {\"type\" : \"text\"},\n" +
-					"				\"dateOfJoining\" : {\"type\" : \"date\"},\n" +
-					"				\"salary\" : {\"type\" : \"text\"},\n" +
-					"				\"picture\" : {\"type\" : \"text\"},\n" +
-					"				\"age\" : {\"type\" : \"integer\"},\n" +
-					"				\"gender\" : {\"type\" : \"text\"},\n" +
-					"				\"eyeColor\" : {\"type\" : \"text\"},\n" +
-					"				\"company\" : {\"type\" : \"text\"},\n" +
-					"				\"email\" : {\"type\" : \"text\"},\n" +
-					"				\"phone\" : {\"type\" : \"text\"},\n" +
-					"				\"addresses\" : {\"type\" : \"nested\",\n" +
-					"					\"properties\" : {\n" +
-					"						\"id\" : {\"type\" : \"integer\"},\n" +
-					"						\"country\" : {\"type\" : \"text\"},\n" +
-					"						\"state\" : {\"type\" : \"text\"},\n" +
-					"						\"city\" : {\"type\" : \"text\"},\n" +
-					"						\"streetNameAndNumber\" : {\"type\" : \"text\"},\n" +
-					"						\"zipCode\" : {\"type\" : \"integer\"}\n" +
-					"					}\n" +
-					"				}\n" +
-					"				\"latitude\" : {\"type\" : \"geo-point\"},\n" +
-					"				\"longitude\" : {\"type\" : \"geo-point\"},\n" +
-					"				\"about\" : {\"type\" : \"text\"},\n" +
-					"				\"interests\" : {\"type\" : \"text\"},\n" +
-					"				\"friends\" : {\"type\" : \"nested\",\n" +
-					"					\"properties\" : {\n" +
-					"						\"id\" : {\"type\" : \"integer\"},\n" +
-					"						\"name\" : {\"type\" : \"text\"}\n" +
-					"					}\n" +
-					"				}\n" +
-					"				\"greeting\" : {\"type\" : \"text\"},\n" +
-					"			}\n" +
-					"		}\n" +
-					"	}\n" +
-					"}";
-			
-			XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().value(sourceString);
-			
-			CreateIndexRequest createIndexRequest = new CreateIndexRequest(INDEX).source(xContentBuilder);
-			
-			CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
-			
-			System.out.println("Created index: " + INDEX + " : " + createIndexResponse.isAcknowledged());
-			
-		} else {
-			System.out.println ("Index already exists");
-		}
 		
 		BulkRequest bulkRequest = new BulkRequest();
 		
 		int count = 0;
 		int batch = 10;
 		
-		BufferedReader br = new BufferedReader(new FileReader("Employees100Generated.json"));
+		BufferedReader br = new BufferedReader(new FileReader("Employees100GeneratedV2ND.json"));
 		
 		String line;
 		
 		while((line = br.readLine()) != null) {
 			
-			bulkRequest.add(new IndexRequest(INDEX).source(line, XContentType.JSON));
+			String idFromLine = line.substring(line.indexOf("id") + 4, line.indexOf(','));
+			
+			Employee employee = objectMapper.readValue(line, Employee.class);
+			
+			Map<String, Object> documentMapper = objectMapper.convertValue(employee, new TypeReference<Map<String, Object>>() {});
+
+			bulkRequest.add(new IndexRequest(INDEX).id(idFromLine).source(documentMapper/*line, XContentType.JSON*/));
 			count++;
 			
 			if(count%batch == 0) {
@@ -337,7 +322,8 @@ public class EmployeeRestService {
 		}
 		
 		System.out.println("Total uploaded " + count);
-		client.close();
+		//client.close();
+		br.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}	

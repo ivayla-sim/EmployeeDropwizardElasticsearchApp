@@ -29,6 +29,9 @@ public class EmployeeDropwizardElasticsearchAppApplication extends Application<E
     @Override
     public void initialize(final Bootstrap<EmployeeDropwizardElasticsearchAppConfiguration> bootstrap) {
         // TODO: application initialization
+    	
+    	
+    	
     }
 
     @Override
@@ -45,9 +48,13 @@ public class EmployeeDropwizardElasticsearchAppApplication extends Application<E
     	environment.lifecycle().manage(elasticRestClient);
     	
     	LOGGER.info("Registering REST resource");
-
-    	environment.jersey().register(new EmployeeRestResources(employeeRestService, environment.getValidator(), elasticRestClient));
+    	
     	//employeeRestService.bulkUploadEmployeeDoc();
+    	
+    	employeeRestService.createIndexMapping();
+    	
+    	environment.jersey().register(new EmployeeRestResources(employeeRestService, environment.getValidator(), elasticRestClient));
+    	
     	
     }
 
