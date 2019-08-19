@@ -13,10 +13,13 @@ import javax.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.Length;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 
 import lombok.Data;
 
 @Data
+@JsonInclude(Include.NON_NULL)
 public class Employee {
 	
 	@NotEmpty(message = "Id cannot be null or empty")
@@ -42,7 +45,7 @@ public class Employee {
 	private String salary;
 	
 	private String picture;
-	private int age;
+	private Integer age;
 	private String gender;
 	private String eyeColor;
 	private String company;
@@ -63,6 +66,22 @@ public class Employee {
 	private List<Friends> friends;
 	private String greeting;
 	
+	private double distanceAway;
+	
+	/*
+	private static double sort;
+	
+	public static double getSort() {
+		return sort;
+	}*/
+	/*
+	public Employee() {};
+	
+	@JsonCreator
+	public Employee(@JsonProperty("sort") double sort) {
+		this.sort = sort;
+	}
+	*/
 	
 	
 

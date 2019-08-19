@@ -5,6 +5,7 @@ import io.dropwizard.Configuration;
 import io.dropwizard.validation.ValidationMethod;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
 //import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 //import org.hibernate.validator.constraints.*;
@@ -87,6 +88,8 @@ public class EmployeeDropwizardElasticsearchAppConfiguration extends Configurati
 	public ObjectMapper objectMapper() {
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+		//objectMapper.setDefaultPropertyInclusion(Include.NON_NULL);
+		//objectMapper.setSerializationInclusion(Include.NON_NULL);
 		
 		return objectMapper;
 		

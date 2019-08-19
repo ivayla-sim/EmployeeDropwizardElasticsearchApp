@@ -3,12 +3,18 @@ package employee.dropwizard.elasticsearch.pck.service;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
+//import org.apache.lucene.index.Terms;
+import org.apache.lucene.search.join.ScoreMode;
 import org.elasticsearch.ElasticsearchException;
 //import org.elasticsearch.action.admin.indices.create.CreateIndexRequest; //deprecated
 import org.elasticsearch.client.indices.CreateIndexRequest;
@@ -31,15 +37,29 @@ import org.elasticsearch.action.update.UpdateResponse;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.GetIndexRequest;
+import org.elasticsearch.common.geo.GeoDistance;
+import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
+//import org.elasticsearch.search.aggregations.bucket.histogram.InternalDateHistogram.Bucket;
+import org.elasticsearch.search.aggregations.bucket.terms.Terms;
+import org.elasticsearch.search.aggregations.bucket.terms.TermsAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.Max;
+import org.elasticsearch.search.aggregations.metrics.Min;
+import org.elasticsearch.search.aggregations.metrics.Avg;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.GeoDistanceSortBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
+import org.elasticsearch.search.sort.SortOrder;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import employee.dropwizard.elasticsearch.pck.api.AggregationBuckets;
 import employee.dropwizard.elasticsearch.pck.core.Employee;
 
 
@@ -77,7 +97,7 @@ public class EmployeeRestService {
 					"		\"number_of_replicas\" : 0\n" +
 					"	},\n" +
 					"	\"mappings\" : {\n" +
-					"		\"_doc\" : {\n" +
+					//"		\"_doc\" : {\n" +
 					"			\"properties\" : {\n" +
 					"				\"id\" : {\"type\" : \"text\"},\n" +
 					"				\"isActive\" : {\"type\" : \"boolean\"},\n" +
@@ -87,7 +107,13 @@ public class EmployeeRestService {
 					"						\"lastName\" : {\"type\" : \"text\"}\n" +
 					"					}\n" +
 					"				},\n" +
-					"				\"designation\" : {\"type\" : \"text\"},\n" +
+					//"				\"designation\" : {\"type\" : \"keyword\"},\n" +
+					"				\"designation\" : {\n" +
+					"					\"type\" : \"text\",\n" +
+					"					\"fields\" : {\n" +
+					"						\"keyword\" : {\"type\" : \"keyword\"}\n" +
+					"					}\n" +
+					"				},\n" +	
 					"				\"dateOfJoining\" : {\"type\" : \"date\"},\n" +
 					"				\"salary\" : {\"type\" : \"text\"},\n" +
 					"				\"picture\" : {\"type\" : \"text\"},\n" +
@@ -118,13 +144,13 @@ public class EmployeeRestService {
 					"				},\n" +
 					"				\"greeting\" : {\"type\" : \"text\"}\n" +
 					"			}\n" +
-					"		}\n" +
+					//"		}\n" +
 					"	}\n" +
 					"}";
 						
 			//XContentBuilder xContentBuilder = XContentFactory.jsonBuilder().value(sourceString);
 			
-			CreateIndexRequest createIndexRequest = new CreateIndexRequest(INDEX).source(/*xContentBuilder*/sourceString, XContentType.JSON);
+			CreateIndexRequest createIndexRequest = new CreateIndexRequest(INDEX).source(sourceString, XContentType.JSON); /*xContentBuilder*/
 			
 			CreateIndexResponse createIndexResponse = client.indices().create(createIndexRequest, RequestOptions.DEFAULT);
 			
@@ -198,11 +224,7 @@ public class EmployeeRestService {
 		
 		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
 		
-		List<SearchHit> searchHits = Arrays.asList(searchResponse.getHits().getHits());
-		List<Employee> results = new ArrayList<Employee>();
-		searchHits.forEach(hit -> results.add(objectMapper.convertValue(hit.getSourceAsMap(), Employee.class)));
-		
-		return results;
+		return convertSearchHitsToListEmployees(searchResponse);
 		
 	}
 	
@@ -301,11 +323,13 @@ public class EmployeeRestService {
 						if(bulkItemResponse.isFailed()) {
 							BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
 							System.out.println("Error " + failure.toString());
+							
 						}
 					}
 				}
 				System.out.println("Uploaded " + count + " so far");
 				bulkRequest = new BulkRequest();
+				//bulkResponse.getItems().toString();
 			}
 		}
 		
@@ -319,6 +343,7 @@ public class EmployeeRestService {
 					}
 				}
 			}
+			//bulkResponse.getItems().toString();
 		}
 		
 		System.out.println("Total uploaded " + count);
@@ -327,6 +352,252 @@ public class EmployeeRestService {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}	
+	}
+	
+	
+	public List<Employee> searchByAddressAttribute(String city, 
+													String country, 
+													String state, 
+													String streetNameAndNumber, 
+													Integer zipCode) throws IOException {
+		
+		System.out.println("Start Service layer SEARCH CITY");
+		
+		String queryAddressValue = (city != null) ? city :
+			(country != null ? country : 
+				(state != null ? state :
+					(streetNameAndNumber != null ? streetNameAndNumber :
+						(zipCode.toString() != null ? zipCode.toString() : " " ))));
+		
+		System.out.println(queryAddressValue);
+
+		String queryAddressAttr = (city != null) ? "city" :
+			(country != null ? "country" : 
+				(state != null ? "state" :
+					(streetNameAndNumber != null ? "streetNameAndNumber" :
+						(zipCode.toString() != null ? "zipCode" : " " ))));
+		
+		System.out.println(queryAddressAttr);
+
+		SearchRequest searchRequest = new SearchRequest();
+
+		SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+
+		QueryBuilder queryBuilder = QueryBuilders
+				.boolQuery()
+				.must(QueryBuilders.matchQuery("addresses." + queryAddressAttr, queryAddressValue));
+
+
+		searchSourceBuilder.query(QueryBuilders
+				.nestedQuery("addresses", queryBuilder, ScoreMode.Avg));
+
+
+		searchRequest.source(searchSourceBuilder);
+
+		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+
+		return convertSearchHitsToListEmployees(searchResponse);
+
+
+	}
+	
+	
+	public List<Employee> searchByRangeDateOfJoining(String startDateStr, String endDateStr) throws IOException, ParseException {
+		
+		System.out.println("Start Service layer SEARCH Date");
+		
+		startDateStr = (startDateStr == null || startDateStr.isEmpty()) ? "1900-01-01" : startDateStr;
+		endDateStr = (endDateStr == null || endDateStr.isEmpty()) ? "2500-12-31" : endDateStr;
+		
+		Date startDate = getDateFromString(startDateStr);
+		Date endDate = getDateFromString(endDateStr);
+		
+		SearchRequest searchRequest = new SearchRequest();
+		
+		SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+		
+		QueryBuilder queryBuilder = QueryBuilders.rangeQuery("dateOfJoining").gte(startDate).lte(endDate).boost(2);
+		
+		searchSourceBuilder.query(queryBuilder);
+		
+		searchRequest.source(searchSourceBuilder);
+		
+		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+		
+		System.out.println("End Service layer SEARCH Date");
+		
+		return convertSearchHitsToListEmployees(searchResponse);
+		
+		
+	}
+	
+	
+	public /*Map<String, Long>*/ List<AggregationBuckets> searchByRangeDateOfJoiningAggByDesignations(String startDateStr, String endDateStr) throws IOException, ParseException {
+		
+		System.out.println("Start Service layer SEARCH Date V2");
+		
+		startDateStr = (startDateStr == null || startDateStr.isEmpty()) ? "1900-01-01" : startDateStr;
+		endDateStr = (endDateStr == null || endDateStr.isEmpty()) ? "2500-12-31" : endDateStr;
+		
+		Date startDate = getDateFromString(startDateStr);
+		Date endDate = getDateFromString(endDateStr);
+		
+		SearchRequest searchRequest = new SearchRequest();		
+		SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+		
+		QueryBuilder queryBuilder = QueryBuilders.rangeQuery("dateOfJoining").gte(startDate).lte(endDate).boost(2);
+		
+		TermsAggregationBuilder bucketByDesignation = AggregationBuilders.terms("designations").field("designation.keyword")
+														.subAggregation(AggregationBuilders.min("minDateOfJoining").field("dateOfJoining"))
+														.subAggregation(AggregationBuilders.max("maxDateOfJoining").field("dateOfJoining"))
+														.subAggregation(AggregationBuilders.avg("avgAge").field("age"));
+					
+		searchSourceBuilder.query(queryBuilder).size(0).aggregation(bucketByDesignation); //without size:0 ES returns all hits
+		
+		searchRequest.source(searchSourceBuilder);
+		
+		System.out.println(searchRequest.source(searchSourceBuilder).toString());
+		
+		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+
+		
+		List<AggregationBuckets> aggregationBucketsList = new ArrayList<AggregationBuckets>();
+		
+		Terms designationsAgg = searchResponse.getAggregations().get("designations");
+		
+		for(Terms.Bucket designationsBucket : designationsAgg.getBuckets()) {
+			
+			AggregationBuckets aggregationBuckets = new AggregationBuckets();
+			
+			aggregationBuckets.setKey(designationsBucket.getKeyAsString());
+			aggregationBuckets.setDocCount(designationsBucket.getDocCount());;
+			
+			Min minDateOfJoiningAgg = designationsBucket.getAggregations().get("minDateOfJoining");
+			aggregationBuckets.setMinDateOfJoining(getDateFromString(minDateOfJoiningAgg.getValueAsString()));
+			
+			Max maxDateOfJoining = designationsBucket.getAggregations().get("maxDateOfJoining");	
+			aggregationBuckets.setMaxDateOfJoining(getDateFromString(maxDateOfJoining.getValueAsString()));
+			
+			Avg avgAgeAgg = designationsBucket.getAggregations().get("avgAge");			
+			aggregationBuckets.setAvgAge(avgAgeAgg.getValue());
+			
+			aggregationBucketsList.add(aggregationBuckets);
+			
+		}
+	
+		
+	/*
+		Map<String, Long> mapResult = new HashMap<String, Long>();
+		
+		Terms agg = searchResponse.getAggregations().get("designations");
+		
+		for(Bucket bucketEntry : agg.getBuckets()) {
+			
+			mapResult.put(bucketEntry.getKeyAsString(), bucketEntry.getDocCount());
+			
+			String key = bucketEntry.getKeyAsString();
+			long docCount = bucketEntry.getDocCount();
+			System.out.println("key = " + key + " docCount = " + docCount);
+			
+		}
+		*/
+		
+		
+		return aggregationBucketsList;
+		
+	}
+	
+	
+	public List<Employee> searchGeoNearestEmployees(double latCenterPoint, double lonCenterPoint, double distEntered) throws IOException {
+		
+		System.out.println("Start Service layer GeoNearest");
+		
+		SearchRequest searchRequest = new SearchRequest();		
+		SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+		
+		QueryBuilder matchAllQuery = QueryBuilders.matchAllQuery();
+		
+		QueryBuilder geoDistanceQuery = QueryBuilders.geoDistanceQuery("location")
+														.geoDistance(GeoDistance.ARC)
+														.point(latCenterPoint, lonCenterPoint) //supplies lat, lon as an array and reverses the values!!!
+														.distance(distEntered, DistanceUnit.KILOMETERS);
+		
+		QueryBuilder queryBuilder = QueryBuilders
+				.boolQuery()
+				.must(matchAllQuery)
+				.filter(geoDistanceQuery);
+		
+		//searchSourceBuilder.fetchSource(false);
+		String[] includeFields = new String[] {"name.firstName", "name.lastName", "phone", "email", "location", "sort"};
+		String[] excludeFields = new String[] {};
+		searchSourceBuilder.fetchSource(includeFields, excludeFields);
+		
+		GeoDistanceSortBuilder geoDistanceSorter = SortBuilders.geoDistanceSort("location", latCenterPoint, lonCenterPoint);
+		geoDistanceSorter.order(SortOrder.ASC);
+	
+		
+		searchSourceBuilder.query(queryBuilder).sort(geoDistanceSorter);
+		
+		//searchSourceBuilder.sort(geoDistanceSorter);
+		
+		
+		
+		searchRequest.source(searchSourceBuilder);
+		
+		
+		
+		System.out.println(searchRequest.toString());
+		
+		SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+		
+		//System.out.println(searchResponse.toString());
+		
+		System.out.println("End Service layer GeoNearest");
+		
+		return convertSearchHitsToListEmployees(searchResponse);
+	}
+	
+	
+	
+	
+	////////////////////////////////// HELPER METHODS ////////////////////////////////////////////////
+	
+	private List<Employee> convertSearchHitsToListEmployees(SearchResponse searchResponse) {
+		
+		List<SearchHit> searchHits = Arrays.asList(searchResponse.getHits().getHits());
+		
+		List<Employee> results = new ArrayList<Employee>();
+		
+		//searchHits.forEach(hit -> results.add(objectMapper.convertValue(hit.getSourceAsMap(), Employee.class)));
+	
+		searchHits.forEach(hit -> {			
+			
+			Map<String, Object> mapTemp = new HashMap<String, Object>();
+			
+			mapTemp = hit.getSourceAsMap();
+			mapTemp.put("distanceAway", (double)(hit.getSortValues()[0])/1000);
+			
+			results.add(objectMapper.convertValue(mapTemp, Employee.class));
+									
+			//System.out.println(results);
+									}
+							);
+		
+		return results;
+		
+	}
+	
+	
+	private Date getDateFromString(String dateString) throws ParseException {
+		
+		//dateString = dateString.length() > 10 ? dateString.substring(0, 10) : dateString;
+		
+	        DateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+	        
+	        Date date = df.parse(dateString);
+	         
+	        return date;
+	   
 	}
 
 }

@@ -4,6 +4,7 @@ import java.io.IOException;
 //import java.util.Map;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -17,10 +18,12 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 
+import employee.dropwizard.elasticsearch.pck.api.AggregationBuckets;
 import employee.dropwizard.elasticsearch.pck.client.ElasticsearchRestClient;
 
 //import org.elasticsearch.action.get.GetRequest;
@@ -172,6 +175,76 @@ public class EmployeeRestResources {
 					
 		return deleteIndexResult;
 		
+		
+	}
+	
+	
+	
+	@GET					//e.g. call 	http://localhost:8080/employees/search?city=Gradets
+	@Path("/_search")
+	public Response searchByAddressAttribute(
+			@QueryParam(value = "city") String city,
+			@QueryParam(value = "country") String country,
+			@QueryParam(value = "state") String state,
+			@QueryParam(value = "streetNameAndNumber") String streetNameAndNumber,
+			@QueryParam(value = "zipCode") Integer zipCode
+												 ) throws IOException {
+		
+		List<Employee> employeeListByAddress = employeeRestService.searchByAddressAttribute(city, country, state, streetNameAndNumber, zipCode);
+		
+		return Response.ok(employeeListByAddress).build();
+		
+	}
+	
+	@GET	//e.g. call 	http://localhost:8080/employees/_search/dateOfJoining?startDate=2016-04-02&endDate=2017-04-02
+	@Path("/_search/dateOfJoining")
+	public Response searchByDateOfJoining (
+			@QueryParam(value = "startDate") String startDateStr,
+			@QueryParam(value = "endDate") String endDateStr
+			) throws IOException, ParseException {
+		
+		System.out.println("REST end point dateOfJoining");
+		
+		List<Employee> employeeListByDateOfJoining = employeeRestService.searchByRangeDateOfJoining(startDateStr, endDateStr);
+		
+		return Response.ok(employeeListByDateOfJoining).build();
+		
+	}
+	
+	
+	@GET	//e.g. call 	http://localhost:8080/employees/_search/dateOfJoining?startDate=2016-04-02&endDate=2017-04-02
+	@Path("/_search/dateOfJoining/designations/agg")
+	public Response searchByRangeDateOfJoiningAggByDesignations (
+			@QueryParam(value = "startDate") String startDateStr,
+			@QueryParam(value = "endDate") String endDateStr
+			) throws IOException, ParseException {
+		
+		System.out.println("REST end point dateOfJoiningV2");
+		
+		//List<Employee> employeeListByDateOfJoining = employeeRestService.searchByRangeDateOfJoiningV2(startDateStr, endDateStr);
+		
+		/*Map<String, Long>*/ List<AggregationBuckets> results = employeeRestService.searchByRangeDateOfJoiningAggByDesignations(startDateStr, endDateStr);
+		
+		return Response.ok(results).build();
+		
+	}
+	
+	
+	@GET
+	@Path("/_search/nearest")
+	public Response searchGeoNearestEmployees (
+			@QueryParam(value = "latitude") double latCenterPoint,
+			@QueryParam(value = "longitude") double lonCenterPoint,
+			@QueryParam(value = "distance") double distEntered
+			) throws IOException {
+		
+		System.out.println("Start REST end point GeoLocation");
+		
+		List<Employee> employeeListNearest = employeeRestService.searchGeoNearestEmployees(latCenterPoint, lonCenterPoint, distEntered);
+		
+		System.out.println("End REST end point GeoLocation");
+		
+		return Response.ok(employeeListNearest).build();
 		
 	}
 	
