@@ -575,11 +575,14 @@ public class EmployeeRestService {
 			Map<String, Object> mapTemp = new HashMap<String, Object>();
 			
 			mapTemp = hit.getSourceAsMap();
-			mapTemp.put("distanceAway", (double)(hit.getSortValues()[0])/1000);
 			
-			results.add(objectMapper.convertValue(mapTemp, Employee.class));
-									
-			//System.out.println(results);
+			if(hit.getSortValues().length > 0) {
+				mapTemp.put("distanceAway", 
+									(double)(hit.getSortValues()[0].equals(null) ? 0 : hit.getSortValues()[0])
+										/1000);
+			}
+			
+			results.add(objectMapper.convertValue(mapTemp, Employee.class));		
 									}
 							);
 		

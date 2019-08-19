@@ -68,21 +68,6 @@ public class Employee {
 	
 	private double distanceAway;
 	
-	/*
-	private static double sort;
-	
-	public static double getSort() {
-		return sort;
-	}*/
-	/*
-	public Employee() {};
-	
-	@JsonCreator
-	public Employee(@JsonProperty("sort") double sort) {
-		this.sort = sort;
-	}
-	*/
-	
 	
 
 }
